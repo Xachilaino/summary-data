@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -36,8 +38,16 @@ public class DataProcessingService {
 
         // 1. 計算昨日的日期範圍
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        String startDate = yesterday.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        String endDate = yesterday.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        
+        // 修正：使用正確的日期格式，符合API要求
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        
+        // 設定昨日的開始和結束時間
+        LocalDateTime startDateTime = yesterday.atStartOfDay();
+        LocalDateTime endDateTime = yesterday.atTime(LocalTime.MAX);
+
+        String startDate = startDateTime.format(formatter);
+        String endDate = endDateTime.format(formatter);
         
         logger.info("取得日期範圍: {} 至 {}", startDate, endDate);
 
