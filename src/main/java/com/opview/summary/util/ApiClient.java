@@ -1,6 +1,7 @@
 package com.opview.summary.util;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.opview.summary.config.AppProperties;
 import com.opview.summary.entity.SummaryApiResponse;
 import org.slf4j.Logger;
@@ -52,13 +53,14 @@ public class ApiClient {
         Map<String, Object> summaryInformation = new HashMap<>();
         summaryInformation.put("search_topic", appProperties.getSearchTopic());
         summaryInformation.put("time_range", String.format("%s~%s", startDate, endDate));
-        summaryInformation.put("search_source", appProperties.getSearchSource());
 
         // 🔹 加入 order_type
         Map<String, String> order = new HashMap<>();
         order.put("field", "post_time");
         order.put("order_type", "des");
         summaryInformation.put("search_order", Collections.singletonList(order));
+
+        summaryInformation.put("search_source", appProperties.getSearchSource());
 
         requestJson.put("user_information", userInformation);
         requestJson.put("summary_information", summaryInformation);
@@ -95,6 +97,15 @@ public class ApiClient {
 
             String body = rawResponse.getBody();
             logger.info("API 原始回應: {}", body);
+
+            // 🔹 格式化 JSON 輸出
+            try {
+                Gson prettyGson = new GsonBuilder().setPrettyPrinting().create();
+                String prettyJson = prettyGson.toJson(gson.fromJson(body, Object.class));
+                logger.info("API 格式化回應:\n{}", prettyJson);
+            } catch (Exception e) {
+                logger.warn("API 回應不是合法 JSON，無法格式化：{}", e.getMessage());
+            }
 
             if (rawResponse.getStatusCode().is2xxSuccessful() && body != null) {
                 try {
