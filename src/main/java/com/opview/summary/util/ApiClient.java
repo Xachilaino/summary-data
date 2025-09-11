@@ -99,7 +99,14 @@ public class ApiClient {
             if (rawResponse.getStatusCode().is2xxSuccessful() && body != null) {
                 try {
                     // 嘗試轉換成 SummaryApiResponse
-                    return gson.fromJson(body, SummaryApiResponse.class);
+                    SummaryApiResponse response = gson.fromJson(body, SummaryApiResponse.class);
+
+                    // 🔹 保留原始 JSON（方便 DataProcessingService 輸出）
+                    if (response != null) {
+                        response.setRawJson(body);
+                    }
+
+                    return response;
                 } catch (Exception e) {
                     logger.error("將 API 回應轉換為 SummaryApiResponse 失敗，回應內容可能不是 JSON：", e);
                     return null;

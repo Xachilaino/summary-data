@@ -52,35 +52,39 @@ public class DataProcessingService {
             SummaryApiResponse apiResponse = apiClient.fetchArticles(startDate, endDate);
 
             // 3. 檢查回應
-            if (apiResponse != null && "0".equals(apiResponse.getResponseInfo().getErrorCode())) {
-                List<Article> articles = apiResponse.getResult();
+            if (apiResponse != null && apiResponse.getResponseInfo() != null) {
+                String errorCode = apiResponse.getResponseInfo().getErrorCode();
+                String errorMessage = apiResponse.getResponseInfo().getErrorMessage();
 
-                if (articles != null && !articles.isEmpty()) {
-                    logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
+                if ("0".equals(errorCode)) {
+                    List<Article> articles = apiResponse.getResult();
 
-                    LocalDateTime now = LocalDateTime.now();
-                    for (Article article : articles) {
-                        if (articleDao.existsById(article.getId())) {
-                            // 已存在 → 更新 updateTime
-                            article.setUpdateTime(now);
-                        } else {
+                    if (articles != null && !articles.isEmpty()) {
+                        logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
+
+                        LocalDateTime now = LocalDateTime.now();
+                        for (Article article : articles) {
                             // 新資料 → 補 createTime & updateTime
-                            article.setCreateTime(now);
+                            if (article.getCreateTime() == null) {
+                                article.setCreateTime(now);
+                            }
+                            // 舊資料 → updateTime 更新
                             article.setUpdateTime(now);
-                        }
-                        articleDao.save(article);
-                    }
 
-                    logger.info("已成功處理 {} 筆文章資料。", articles.size());
+                            // 使用 UPSERT 避免主鍵衝突
+                            articleDao.upsert(article);
+                        }
+
+                        logger.info("已成功處理 {} 筆文章資料。", articles.size());
+                    } else {
+                        logger.warn("API 回應成功，但沒有取得任何文章資料。");
+                    }
                 } else {
-                    logger.warn("API 回應成功，但沒有取得任何文章資料。");
+                    logger.error("從 API 取得文章資料失敗。錯誤碼: {}, 錯誤訊息: {}", errorCode, errorMessage);
                 }
             } else {
-                String error = apiResponse != null ?
-                        "錯誤碼: " + apiResponse.getResponseInfo().getErrorCode() +
-                        ", 錯誤訊息: " + apiResponse.getResponseInfo().getErrorMessage() :
-                        "API 回應為空或格式不正確";
-                logger.error("從 API 取得文章資料失敗。原因: {}", error);
+                // 🔹 responseInfo 為 null，直接輸出原始 JSON
+                logger.error("API 回應格式異常，可能是 mapping 錯誤。原始回應: {}", apiResponse);
             }
         } catch (Exception e) {
             logger.error("資料處理過程中發生例外錯誤：", e);
