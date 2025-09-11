@@ -6,7 +6,6 @@ import java.time.format.DateTimeParseException;
 
 public class DateTimeUtil {
 
-    // 常用格式：API & 資料庫 post_time 格式
     private static final DateTimeFormatter DEFAULT_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
 

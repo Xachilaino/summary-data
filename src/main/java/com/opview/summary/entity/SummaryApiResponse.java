@@ -1,13 +1,17 @@
 package com.opview.summary.entity;
 
+import com.google.gson.annotations.SerializedName;
 import java.util.List;
 
 public class SummaryApiResponse {
 
+    @SerializedName("response_info")
     private ResponseInfo responseInfo;
+
+    @SerializedName("result")
     private List<Article> result;
 
-    // 🔹 保留 API 原始 JSON
+    // 🔹 保留 API 原始 JSON（方便 debug）
     private transient String rawJson;
 
     public ResponseInfo getResponseInfo() {
@@ -37,22 +41,5 @@ public class SummaryApiResponse {
     @Override
     public String toString() {
         return rawJson != null ? rawJson : super.toString();
-    }
-
-    public static class ResponseInfo {
-        private String searchId;
-        private String version;
-        private String errorCode;
-        private String errorMessage;
-        private double queryTime;
-        private int totalMention;
-
-        // Getter / Setter ...
-        
-        public String getErrorCode() { return errorCode; }
-        public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
-
-        public String getErrorMessage() { return errorMessage; }
-        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     }
 }
