@@ -41,7 +41,7 @@ public class ApiClient {
      * @return 包含 API 回應資料的 SummaryApiResponse 物件，若失敗則為 null。
      */
     public SummaryApiResponse fetchArticles(String startDate, String endDate) {
-        // 1. 建立符合 API 文件要求的 Request JSON 物件
+        // 1. 組 Request JSON
         Map<String, Object> requestJson = new HashMap<>();
 
         Map<String, String> userInformation = new HashMap<>();
@@ -53,59 +53,68 @@ public class ApiClient {
         summaryInformation.put("search_topic", appProperties.getSearchTopic());
         summaryInformation.put("time_range", String.format("%s~%s", startDate, endDate));
         summaryInformation.put("search_source", appProperties.getSearchSource());
-        summaryInformation.put("search_order", Collections.singletonList(
-                Collections.singletonMap("field", "post_time")
-        ));
-        
+
+        // 🔹 加入 order_type
+        Map<String, String> order = new HashMap<>();
+        order.put("field", "post_time");
+        order.put("order_type", "des");
+        summaryInformation.put("search_order", Collections.singletonList(order));
+
         requestJson.put("user_information", userInformation);
         requestJson.put("summary_information", summaryInformation);
-        
-        // 2. 將 JSON 物件轉換為字串
+
+        // 2. JSON 轉字串
         String jsonPayload = gson.toJson(requestJson);
 
-        // 3. 準備 x-www-form-urlencoded 格式的請求體
+        // 3. 準備請求體 (x-www-form-urlencoded)
         MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
         requestBody.add("txtInput_json", jsonPayload);
 
-        // 4. 設定請求標頭
+        // 4. headers
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON)); // 告知伺服器我們期望 JSON 回應
+        headers.setAccept(Collections.singletonList(MediaType.ALL)); // 允許所有回應格式
 
-        // 5. 建立 HTTP 請求實體
         HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
 
         String apiUrl = appProperties.getApiUrl();
         logger.info("正在向 API 發送請求: {}，參數: txtInput_json={}", apiUrl, jsonPayload);
 
-        // 6. 發送 POST 請求並處理回應
         try {
-            ResponseEntity<SummaryApiResponse> responseEntity = restTemplate.exchange(
+            // 5. 先拿 raw String（避免 Content-Type 錯誤導致解析失敗）
+            ResponseEntity<String> rawResponse = restTemplate.exchange(
                     apiUrl,
                     HttpMethod.POST,
                     requestEntity,
-                    SummaryApiResponse.class
+                    String.class
             );
 
-            if (responseEntity.getStatusCode().is2xxSuccessful()) {
-                SummaryApiResponse apiResponse = responseEntity.getBody();
-                if (apiResponse != null) {
-                    logger.info("API 請求成功，收到回應。");
-                    return apiResponse;
-                } else {
-                    logger.error("API 回應體為空。");
+            logger.info("HTTP 回應狀態: {}, Content-Type: {}",
+                    rawResponse.getStatusCodeValue(),
+                    rawResponse.getHeaders().getContentType());
+
+            String body = rawResponse.getBody();
+            logger.info("API 原始回應: {}", body);
+
+            if (rawResponse.getStatusCode().is2xxSuccessful() && body != null) {
+                try {
+                    // 嘗試轉換成 SummaryApiResponse
+                    return gson.fromJson(body, SummaryApiResponse.class);
+                } catch (Exception e) {
+                    logger.error("將 API 回應轉換為 SummaryApiResponse 失敗，回應內容可能不是 JSON：", e);
                     return null;
                 }
             } else {
-                logger.error("API 請求失敗，狀態碼: {}", responseEntity.getStatusCode());
+                logger.error("API 回應非 2xx 或 body 為空");
                 return null;
             }
+
         } catch (HttpClientErrorException e) {
-            logger.error("HTTP 客戶端錯誤，請求 API 失敗: {} - {}", e.getStatusCode(), e.getStatusText());
+            logger.error("HTTP 錯誤: {} - {}", e.getStatusCode(), e.getStatusText());
             logger.error("回應體: {}", e.getResponseBodyAsString());
             return null;
         } catch (Exception e) {
-            logger.error("請求 API 時發生未知錯誤: ", e);
+            logger.error("呼叫 API 發生未知錯誤: ", e);
             return null;
         }
     }

@@ -15,7 +15,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-@Service // 標記為 Spring Service，讓 Spring 管理這個組件
+@Service
 public class DataProcessingService {
 
     private static final Logger logger = LoggerFactory.getLogger(DataProcessingService.class);
@@ -23,7 +23,6 @@ public class DataProcessingService {
     private final ApiClient apiClient;
     private final ArticleDao articleDao;
 
-    // 透過建構子注入相依性
     @Autowired
     public DataProcessingService(ApiClient apiClient, ArticleDao articleDao) {
         this.apiClient = apiClient;
@@ -38,47 +37,52 @@ public class DataProcessingService {
 
         // 1. 計算昨日的日期範圍
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        
-        // 修正：使用正確的日期格式，符合API要求
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
-        
-        // 設定昨日的開始和結束時間
+
         LocalDateTime startDateTime = yesterday.atStartOfDay();
         LocalDateTime endDateTime = yesterday.atTime(LocalTime.MAX);
 
         String startDate = startDateTime.format(formatter);
         String endDate = endDateTime.format(formatter);
-        
+
         logger.info("取得日期範圍: {} 至 {}", startDate, endDate);
 
         try {
-            // 2. 呼叫 ApiClient 取得 API 回應
+            // 2. 呼叫 API
             SummaryApiResponse apiResponse = apiClient.fetchArticles(startDate, endDate);
 
-            // 3. 檢查 API 回應是否成功
-            if (apiResponse != null && "0000".equals(apiResponse.getResponseInfo().getErrorCode())) {
+            // 3. 檢查回應
+            if (apiResponse != null && "0".equals(apiResponse.getResponseInfo().getErrorCode())) {
                 List<Article> articles = apiResponse.getResult();
-                
+
                 if (articles != null && !articles.isEmpty()) {
                     logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
 
-                    // 4. 使用 ArticleDao 將資料存入資料庫
-                    articleDao.saveAll(articles);
-                    
-                    logger.info("已成功將 {} 筆文章資料存入資料庫。", articles.size());
+                    LocalDateTime now = LocalDateTime.now();
+                    for (Article article : articles) {
+                        if (articleDao.existsById(article.getId())) {
+                            // 已存在 → 更新 updateTime
+                            article.setUpdateTime(now);
+                        } else {
+                            // 新資料 → 補 createTime & updateTime
+                            article.setCreateTime(now);
+                            article.setUpdateTime(now);
+                        }
+                        articleDao.save(article);
+                    }
+
+                    logger.info("已成功處理 {} 筆文章資料。", articles.size());
                 } else {
                     logger.warn("API 回應成功，但沒有取得任何文章資料。");
                 }
             } else {
-                // 處理 API 呼叫失敗的情況
                 String error = apiResponse != null ?
-                               "錯誤碼: " + apiResponse.getResponseInfo().getErrorCode() +
-                               ", 錯誤訊息: " + apiResponse.getResponseInfo().getErrorMessage() :
-                               "API 回應為空或格式不正確";
+                        "錯誤碼: " + apiResponse.getResponseInfo().getErrorCode() +
+                        ", 錯誤訊息: " + apiResponse.getResponseInfo().getErrorMessage() :
+                        "API 回應為空或格式不正確";
                 logger.error("從 API 取得文章資料失敗。原因: {}", error);
             }
         } catch (Exception e) {
-            // 處理在執行過程中發生的任何例外
             logger.error("資料處理過程中發生例外錯誤：", e);
         }
 

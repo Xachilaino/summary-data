@@ -9,9 +9,6 @@ public class ResponseInfo {
     private float queryTime;
     private int total_mention;
 
-    // 您需要為所有欄位添加 Getter 和 Setter 方法
-    // 通常 IDE 都可以自動生成
-
     public String getSearch_id() {
         return search_id;
     }
