@@ -18,27 +18,30 @@ public class AppConfig {
         return new RestTemplate();
     }
 
-    // Gson bean：加入 LocalDateTime 的序列化/反序列化 + 自動處理底線命名
+    // Gson bean： LocalDateTime 的序列化/反序列化 + 自動處理底線命名
     @Bean
     public Gson gson() {
         GsonBuilder builder = new GsonBuilder();
 
-        // ✅ 自動把 API 的 snake_case (e.g. s_name) 映射到 Java 的 camelCase (sName)
+        // 把 API 的 snake_case 映射到 Java 的 camelCase 
         builder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
 
         // 反序列化 LocalDateTime
         builder.registerTypeAdapter(LocalDateTime.class,
                 (com.google.gson.JsonDeserializer<LocalDateTime>) (json, typeOfT, context) -> {
+                    if (json == null || json.getAsString().isEmpty()) return null;
+                    String s = json.getAsString();
                     try {
-                        if (json == null || json.getAsString().isEmpty()) return null;
-                        String s = json.getAsString();
-                        DateTimeFormatter f1 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                        return LocalDateTime.parse(s, f1);
-                    } catch (Exception ex) {
+                        return LocalDateTime.parse(s, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception ex1) {
                         try {
-                            return LocalDateTime.parse(json.getAsString());
+                            return LocalDateTime.parse(s, DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"));
                         } catch (Exception ex2) {
-                            return null;
+                            try {
+                                return LocalDateTime.parse(s); // fallback ISO 格式
+                            } catch (Exception ex3) {
+                                return null;
+                            }
                         }
                     }
                 });

@@ -29,11 +29,11 @@ public class DataProcessingService {
         this.articleDao = articleDao;
     }
 
-    /**
-     * 執行整個資料處理流程：取得昨日文章資訊並存入資料庫。
-     */
+    
+     // 取得昨日文章資訊並存入資料庫。
+     
     public void processDailyArticles() {
-        logger.info("開始執行每日文章資料處理排程...");
+        logger.info("開始取得昨天的文章資訊...");
 
         // 1. 計算昨日的日期範圍
         LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -90,6 +90,6 @@ public class DataProcessingService {
             logger.error("資料處理過程中發生例外錯誤：", e);
         }
 
-        logger.info("每日文章資料處理排程執行完畢。");
+        logger.info("文章資料處理排程執行完畢。");
     }
 }

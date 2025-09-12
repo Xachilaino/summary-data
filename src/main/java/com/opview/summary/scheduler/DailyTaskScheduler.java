@@ -32,7 +32,7 @@ public class DailyTaskScheduler {
      */
     @Scheduled(cron = "${opview.api.cronExpression}")
     public void runDailyTask() {
-        logger.info("排程任務開始執行，時間：{}", LocalDateTime.now());
+        logger.info("開始執行任務，時間：{}", LocalDateTime.now());
 
         ExecutionLog log = new ExecutionLog();
         log.setStartTime(LocalDateTime.now());
@@ -47,11 +47,11 @@ public class DailyTaskScheduler {
             // 任務成功完成後，記錄結束時間
             savedLog.setEndTime(LocalDateTime.now());
             logDao.save(savedLog);
-            logger.info("排程任務執行成功，時間：{}", LocalDateTime.now());
+            logger.info("任務執行成功，時間：{}", LocalDateTime.now());
 
         } catch (Exception e) {
             // 如果任務執行失敗，記錄錯誤訊息並更新結束時間
-            logger.error("排程任務執行失敗：{}", e.getMessage(), e);
+            logger.error("任務執行失敗：{}", e.getMessage(), e);
             savedLog.setEndTime(LocalDateTime.now());
             logDao.save(savedLog);
         }

@@ -1,6 +1,5 @@
 package com.opview.summary.entity;
 
-import com.google.gson.annotations.SerializedName;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
@@ -16,61 +15,47 @@ public class Article {
     private String title;
     private String content;
 
-    @SerializedName("s_name")
     @Column("s_name")
     private String sName;
 
-    @SerializedName("s_area_name")
     @Column("s_area_name")
     private String sAreaName;
 
-    @SerializedName("page_url")
     @Column("page_url")
     private String pageUrl;
 
-    @SerializedName("post_time")
     @Column("post_time")
-    private String postTime;
+    private LocalDateTime postTime;
 
     private String author;
 
-    @SerializedName("main_id")
     @Column("main_id")
     private String mainId;
 
-    @SerializedName("positive_percentage")
     @Column("positive_percentage")
     private float positivePercentage;
 
-    @SerializedName("negative_percentage")
     @Column("negative_percentage")
     private float negativePercentage;
 
-    @SerializedName("comment_count")
     @Column("comment_count")
     private int commentCount;
 
-    @SerializedName("view_count")
     @Column("view_count")
     private int viewCount;
 
-    @SerializedName("used_count")
     @Column("used_count")
     private int usedCount;
 
-    @SerializedName("content_type")
     @Column("content_type")
     private String contentType;
 
-    @SerializedName("sentiment_tag")
     @Column("sentiment_tag")
     private String sentimentTag;
 
-    @SerializedName("_hit_num")
     @Column("_hit_num")
     private int hitNum;
 
-    @SerializedName("article_type")
     @Column("article_type")
     private String articleType;
 
@@ -129,11 +114,11 @@ public class Article {
         this.pageUrl = pageUrl;
     }
 
-    public String getPostTime() {
+    public LocalDateTime getPostTime() {
         return postTime;
     }
 
-    public void setPostTime(String postTime) {
+    public void setPostTime(LocalDateTime postTime) {
         this.postTime = postTime;
     }
 
