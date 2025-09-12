@@ -1,6 +1,7 @@
 package com.opview.summary.util;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.opview.summary.config.AppProperties;
 import com.opview.summary.entity.SummaryApiResponse;
 import org.slf4j.Logger;
@@ -25,12 +26,14 @@ public class ApiClient {
     private final AppProperties appProperties;
     private final RestTemplate restTemplate;
     private final Gson gson;
+    private final Gson prettyGson;
 
     @Autowired
     public ApiClient(AppProperties appProperties, RestTemplate restTemplate, Gson gson) {
         this.appProperties = appProperties;
         this.restTemplate = restTemplate;
         this.gson = gson;
+        this.prettyGson = new GsonBuilder().setPrettyPrinting().create();
     }
 
     /**
@@ -73,12 +76,12 @@ public class ApiClient {
         // 4. headers
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.setAccept(Collections.singletonList(MediaType.ALL)); // 允許所有回應格式
+        headers.setAccept(Collections.singletonList(MediaType.ALL));
 
         HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
 
         String apiUrl = appProperties.getApiUrl();
-        logger.info("正在向 API 發送請求: {}，參數: txtInput_json={}", apiUrl, jsonPayload);
+        logger.info("正在向 API 發送請求: {}", apiUrl);
 
         try {
             // 5. 先拿 raw String（避免 Content-Type 錯誤導致解析失敗）
@@ -90,38 +93,36 @@ public class ApiClient {
             );
 
             logger.info("HTTP 回應狀態: {}, Content-Type: {}",
-                    rawResponse.getStatusCodeValue(),
+                    rawResponse.getStatusCode().value(),
                     rawResponse.getHeaders().getContentType());
 
             String body = rawResponse.getBody();
-            logger.info("API 原始回應: {}", body);
 
             if (rawResponse.getStatusCode().is2xxSuccessful() && body != null) {
                 try {
                     // 嘗試轉換成 SummaryApiResponse
                     SummaryApiResponse response = gson.fromJson(body, SummaryApiResponse.class);
-
-                    // 🔹 保留原始 JSON（方便 DataProcessingService 輸出）
+                    // 🔹 保留原始 JSON
                     if (response != null) {
                         response.setRawJson(body);
                     }
-
                     return response;
                 } catch (Exception e) {
-                    logger.error("將 API 回應轉換為 SummaryApiResponse 失敗，回應內容可能不是 JSON：", e);
+                    logger.error("將 API 回應轉換為 SummaryApiResponse 失敗。原始回應:\n{}", body, e);
                     return null;
                 }
             } else {
-                logger.error("API 回應非 2xx 或 body 為空");
+                logger.error("API 回應非 2xx 或 body 為空。原始回應:\n{}", body);
                 return null;
             }
 
         } catch (HttpClientErrorException e) {
             logger.error("HTTP 錯誤: {} - {}", e.getStatusCode(), e.getStatusText());
-            logger.error("回應體: {}", e.getResponseBodyAsString());
+            logger.error("回應體:\n{}", e.getResponseBodyAsString());
+            logger.error("當時請求 JSON:\n{}", prettyGson.toJson(requestJson));
             return null;
         } catch (Exception e) {
-            logger.error("呼叫 API 發生未知錯誤: ", e);
+            logger.error("呼叫 API 發生未知錯誤。當時請求 JSON:\n{}", prettyGson.toJson(requestJson), e);
             return null;
         }
     }

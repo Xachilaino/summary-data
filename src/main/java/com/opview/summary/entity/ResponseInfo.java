@@ -1,20 +1,32 @@
 package com.opview.summary.entity;
 
+import com.google.gson.annotations.SerializedName;
+
 public class ResponseInfo {
 
-    private String search_id;
-    private String version;
-    private String errorCode;
-    private String errorMessage;
-    private float queryTime;
-    private int total_mention;
+    @SerializedName("search_id")
+    private String searchId;
 
-    public String getSearch_id() {
-        return search_id;
+    private String version;
+
+    @SerializedName("errorCode")
+    private String errorCode;
+
+    @SerializedName("errorMessage")
+    private String errorMessage;
+
+    private float queryTime;
+
+    @SerializedName("total_mention")
+    private int totalMention;
+
+    // === Getter / Setter ===
+    public String getSearchId() {
+        return searchId;
     }
 
-    public void setSearch_id(String search_id) {
-        this.search_id = search_id;
+    public void setSearchId(String searchId) {
+        this.searchId = searchId;
     }
 
     public String getVersion() {
@@ -49,11 +61,11 @@ public class ResponseInfo {
         this.queryTime = queryTime;
     }
 
-    public int getTotal_mention() {
-        return total_mention;
+    public int getTotalMention() {
+        return totalMention;
     }
 
-    public void setTotal_mention(int total_mention) {
-        this.total_mention = total_mention;
+    public void setTotalMention(int totalMention) {
+        this.totalMention = totalMention;
     }
 }
