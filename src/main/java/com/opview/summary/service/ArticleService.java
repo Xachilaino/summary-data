@@ -26,9 +26,6 @@ public class ArticleService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    /**
-     * 查詢：依時間範圍 + sentiment_tag=N
-     */
     public List<Article> queryArticles(QueryRequest request) {
         String sql = """
             SELECT * FROM ts_page_content
@@ -49,24 +46,24 @@ public class ArticleService {
                     a.setsName(rs.getString("s_name"));
                     a.setsAreaName(rs.getString("s_area_name"));
                     a.setPageUrl(rs.getString("page_url"));
-                    a.setPostTime(rs.getTimestamp("post_time") != null ? rs.getTimestamp("post_time").toLocalDateTime() : null);
+                    a.setPostTime(rs.getTimestamp("post_time") != null
+                            ? rs.getTimestamp("post_time").toLocalDateTime()
+                            : null);
                     a.setAuthor(rs.getString("author"));
                     a.setMainId(rs.getString("main_id"));
                     a.setSentimentTag(rs.getString("sentiment_tag"));
-                    a.setUpdateTime(rs.getTimestamp("update_time") != null ? rs.getTimestamp("update_time").toLocalDateTime() : null);
+                    a.setUpdateTime(rs.getTimestamp("update_time") != null
+                            ? rs.getTimestamp("update_time").toLocalDateTime()
+                            : null);
                     return a;
                 });
     }
 
-    /**
-     * 更新：依 ID + 動態欄位
-     */
     public String updateArticle(UpdateRequest request) {
         if (request.getFields() == null || request.getFields().isEmpty()) {
             return "更新失敗：未提供任何更新欄位";
         }
 
-        // 不允許更新的欄位
         List<String> immutableFields = List.of("id", "create_time");
 
         StringBuilder sql = new StringBuilder("UPDATE ts_page_content SET ");
@@ -80,7 +77,7 @@ public class ArticleService {
 
             if (immutableFields.contains(field)) {
                 ignoredFields.append(field).append(" ");
-                continue; // 跳過不可更動欄位
+                continue;
             }
 
             sql.append(field).append(" = :").append(field).append(", ");
@@ -92,7 +89,6 @@ public class ArticleService {
             return "更新失敗：全部欄位不可更動 (忽略: " + ignoredFields + ")";
         }
 
-        // 強制更新 update_time
         sql.append("update_time = :updateTime WHERE id = :id");
         params.addValue("updateTime", LocalDateTime.now());
         params.addValue("id", request.getId());
@@ -110,9 +106,6 @@ public class ArticleService {
         }
     }
 
-    /**
-     * 刪除：依時間範圍 + sentiment_tag=N，並回傳被刪除的 id 和 title
-     */
     public List<Map<String, Object>> deleteArticlesWithInfo(DeleteRequest request) {
         String selectSql = """
             SELECT id, title FROM ts_page_content
@@ -124,14 +117,12 @@ public class ArticleService {
                 .addValue("start", request.getStartTime())
                 .addValue("end", request.getEndTime());
 
-        // 先查出要刪除的文章
         List<Map<String, Object>> toDelete = jdbcTemplate.query(selectSql, params,
                 (rs, rowNum) -> Map.of(
                         "id", rs.getString("id"),
                         "title", rs.getString("title")
                 ));
 
-        // 如果有符合條件才執行刪除
         if (!toDelete.isEmpty()) {
             String deleteSql = """
                 DELETE FROM ts_page_content
@@ -142,5 +133,27 @@ public class ArticleService {
         }
 
         return toDelete;
+    }
+
+    /**
+     * 查詢指定時間範圍的前 10 筆文章內容 (for Gemini 摘要用)
+     */
+    public List<Map<String, String>> findTop10Contents(LocalDateTime start, LocalDateTime end) {
+        String sql = """
+            SELECT id, content FROM ts_page_content
+            WHERE post_time BETWEEN :start AND :end
+            ORDER BY post_time DESC
+            LIMIT 10
+        """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("start", start)
+                .addValue("end", end);
+
+        return jdbcTemplate.query(sql, params,
+                (rs, rowNum) -> Map.of(
+                        "id", rs.getString("id"),
+                        "content", rs.getString("content")
+                ));
     }
 }

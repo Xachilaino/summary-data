@@ -3,6 +3,7 @@ package com.opview.summary.dto;
 import java.time.LocalDateTime;
 
 public class DeleteRequest {
+
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 

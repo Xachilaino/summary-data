@@ -3,6 +3,7 @@ package com.opview.summary.dto;
 import java.time.LocalDateTime;
 
 public class QueryRequest {
+	
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 
