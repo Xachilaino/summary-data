@@ -136,11 +136,12 @@ public class ArticleService {
     }
 
     /**
-     * 查詢指定時間範圍的前 10 筆文章內容 (for Gemini 摘要用)
+     * 查詢指定時間範圍的前 10 筆文章內容(回傳 id + title + content) for Gemini 摘要用
      */
     public List<Map<String, String>> findTop10Contents(LocalDateTime start, LocalDateTime end) {
         String sql = """
-            SELECT id, content FROM ts_page_content
+            SELECT id, title, content
+            FROM ts_page_content
             WHERE post_time BETWEEN :start AND :end
             ORDER BY post_time DESC
             LIMIT 10
@@ -153,6 +154,7 @@ public class ArticleService {
         return jdbcTemplate.query(sql, params,
                 (rs, rowNum) -> Map.of(
                         "id", rs.getString("id"),
+                        "title", rs.getString("title"),
                         "content", rs.getString("content")
                 ));
     }
