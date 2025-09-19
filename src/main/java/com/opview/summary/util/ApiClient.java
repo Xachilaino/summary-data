@@ -18,6 +18,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+//封裝與外部 Summary API 溝通的所有細節，包括建立請求、發送請求、接收回應、初步解析
+
 @Component
 public class ApiClient {
 
@@ -37,16 +39,14 @@ public class ApiClient {
     }
 
     /**
-     * 向 Summary API 發送 POST 請求，取得指定日期的文章資訊。
-     *
      * @param startDate 文章開始日期 (格式: yyyy/MM/dd HH:mm:ss)
      * @param endDate   文章結束日期 (格式: yyyy/MM/dd HH:mm:ss)
      * @return 包含 API 回應資料的 SummaryApiResponse 物件，若失敗則為 null。
      */
     public SummaryApiResponse fetchArticles(String startDate, String endDate) {
-        // 1. 組 Request JSON
+        // 向 Summary API 發送 POST 請求，取得指定日期的文章資訊
         Map<String, Object> requestJson = new HashMap<>();
-
+        //動態建立巢狀 JSON 物件
         Map<String, String> userInformation = new HashMap<>();
         userInformation.put("service_account", appProperties.getServiceAccount());
         userInformation.put("user_account", appProperties.getUserAccount());
@@ -56,40 +56,41 @@ public class ApiClient {
         summaryInformation.put("search_topic", appProperties.getSearchTopic());
         summaryInformation.put("time_range", String.format("%s~%s", startDate, endDate));
         summaryInformation.put("search_source", appProperties.getSearchSource());
-
-        // 🔹 加入 order_type
+        
         Map<String, String> order = new HashMap<>();
         order.put("field", "post_time");
         order.put("order_type", "des");
         summaryInformation.put("search_order", Collections.singletonList(order));
+        // 加入 order_type
 
         requestJson.put("user_information", userInformation);
         requestJson.put("summary_information", summaryInformation);
 
-        // 2. JSON 轉字串
         String jsonPayload = gson.toJson(requestJson);
+        // MAP 轉 JSON 字串
 
-        // 3. 準備請求體 (x-www-form-urlencoded)
         MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
         requestBody.add("txtInput_json", jsonPayload);
-
-        // 4. headers
+        //使用 LinkedMultiValueMap 建立表單，以符合 x-www-form-urlencoded 格式
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         headers.setAccept(Collections.singletonList(MediaType.ALL));
+        // 告知伺服器請求體的格式，Content-Type: application/x-www-form-urlencoded
 
         HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
+        //封裝requestBody與headers
 
         String apiUrl = appProperties.getApiUrl();
         logger.info("正在向 API 發送請求: {}", apiUrl);
 
         try {
-            // 5. 先拿 raw String（避免 Content-Type 錯誤導致解析失敗）
             ResponseEntity<String> rawResponse = restTemplate.exchange(
                     apiUrl,
                     HttpMethod.POST,
                     requestEntity,
                     String.class
+                    //保留原始回應
             );
 
             logger.info("HTTP 回應狀態: {}, Content-Type: {}",
@@ -100,9 +101,8 @@ public class ApiClient {
 
             if (rawResponse.getStatusCode().is2xxSuccessful() && body != null) {
                 try {
-                    // 嘗試轉換成 SummaryApiResponse
                     SummaryApiResponse response = gson.fromJson(body, SummaryApiResponse.class);
-                    // 🔹 保留原始 JSON
+                    // HTTP 狀態碼提示成功，則將回應轉換為 SummaryApiResponse
                     if (response != null) {
                         response.setRawJson(body);
                     }

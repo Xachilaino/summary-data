@@ -23,13 +23,12 @@ public class ArticleController {
         this.articleService = articleService;
     }
 
-    /**
-     * 查詢文章
-     * POST /api/articles/query
-     */
+    // 查詢文章
     @PostMapping("/query")
     public ResponseEntity<?> queryArticles(@RequestBody QueryRequest request) {
+        // 將 json body 轉換為 QueryRequest
         List<Article> result = articleService.queryArticles(request);
+        // 呼叫 articleService.queryArticles
         if (result == null || result.isEmpty()) {
             return ResponseEntity.ok(Map.of(
                     "success", false,
@@ -42,15 +41,14 @@ public class ArticleController {
         ));
     }
 
-    /**
-     * 更新文章
-     * POST /api/articles/update
-     */
+    // 更新文章
     @PostMapping("/update")
     public ResponseEntity<Map<String, Object>> updateArticle(@RequestBody UpdateRequest request) {
+        // 將 json body 轉換為 UpdateRequest
         String message = articleService.updateArticle(request);
-
-        boolean success = message.contains("成功"); // 判斷是否成功
+        // 呼叫 articleService.updateArticle
+        boolean success = message.contains("成功"); 
+        // 判斷是否成功
 
         return ResponseEntity.ok(Map.of(
                 "success", success,
@@ -59,14 +57,12 @@ public class ArticleController {
         ));
     }
 
-    /**
-     * 刪除文章
-     * POST /api/articles/delete
-     */
+    // 刪除文章
     @PostMapping("/delete")
     public ResponseEntity<Map<String, Object>> deleteArticles(@RequestBody DeleteRequest request) {
+        // 將 json body 轉換為 DeleteRequest
         List<Map<String, Object>> deleted = articleService.deleteArticlesWithInfo(request);
-
+        // 呼叫 articleService.deleteArticlesWithInfo
         if (deleted.isEmpty()) {
             return ResponseEntity.ok(Map.of(
                     "success", false,

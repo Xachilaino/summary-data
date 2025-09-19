@@ -21,19 +21,20 @@ public class SummaryController {
         this.geminiService = geminiService;
     }
 
-    /**
-     * 查詢文章摘要（透過 JSON body 傳入時間範圍）
-     * POST /api/summary
-     */
+
+    // POST /api/summary
     @PostMapping("/summary")
     public ResponseEntity<?> getSummary(@RequestBody QueryRequest request) {
+        // 將請求的 JSON 轉換為 QueryRequest
         try {
             var top10 = articleService.findTop10Contents(
                     request.getStartTime(),
                     request.getEndTime()
+                    // 呼叫 articleService 的 findTop10Contents 方法
             );
             List<Map<String, String>> summaries = geminiService.summarizeEachArticle(top10);
             return ResponseEntity.ok(summaries);
+            // 由 geminiService 負責處理與gemini API相關的邏輯
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError()

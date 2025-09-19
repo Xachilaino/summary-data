@@ -15,16 +15,17 @@ public class GeminiService {
     private final Client client;
     private final Bucket apiCallBucket;
     private final Bucket tokenBucket;
+    //client 為 Google AI 官方提供的 Java 客戶端 ； 使用 Bucket4j 函式庫協助限制 API 呼叫數和 Token 限制
 
     public GeminiService(Bucket apiCallBucket, Bucket tokenBucket) {
-        this.client = new Client(); // 會自動讀取 GEMINI_API_KEY
+        this.client = new Client(); 
+        // 會自動自動從系統環境變數中讀取 GEMINI_API_KEY
         this.apiCallBucket = apiCallBucket;
         this.tokenBucket = tokenBucket;
     }
 
-    /**
-     * 逐篇產生文章摘要 (回傳包含 id + title + content + summary + limitInfo)
-     */
+
+    //接收一個文章列表，逐篇產生文章摘要
     public List<Map<String, String>> summarizeEachArticle(List<Map<String, String>> articles) {
         if (articles == null || articles.isEmpty()) {
             return List.of(Map.of("error", "查無文章內容，無法產生摘要。"));
@@ -35,8 +36,9 @@ public class GeminiService {
             String title = article.get("title");
             String content = article.get("content");
 
-            // === API 呼叫數限制 ===
+            
             if (!apiCallBucket.tryConsume(1)) {
+                //  API 呼叫數限制 ===
                 return Map.of(
                         "id", id,
                         "title", title,
@@ -46,9 +48,9 @@ public class GeminiService {
                 );
             }
 
-            // === Token 限制 ===
             int estimatedTokens = estimateTokens(content);
             if (!tokenBucket.tryConsume(estimatedTokens)) {
+                // === Token 限制 ===
                 return Map.of(
                         "id", id,
                         "title", title,
@@ -59,8 +61,9 @@ public class GeminiService {
                 );
             }
 
+            
+            String prompt = "請將以下文章濃縮成 50 字以內的摘要，使用簡單明確的句子：\n\n" + content;
             // === 呼叫 Gemini API ===
-            String prompt = "請針對以下文章內容做摘要，簡短描述重點：\n\n" + content;
 
             try {
                 GenerateContentResponse response = client.models.generateContent(
