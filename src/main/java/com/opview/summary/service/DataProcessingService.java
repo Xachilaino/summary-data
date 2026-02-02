@@ -29,50 +29,51 @@ public class DataProcessingService {
         this.articleDao = articleDao;
     }
 
-    /**
-     * 執行整個資料處理流程：取得昨日文章資訊並存入資料庫。
-     */
+    
+     
+     
     public void processDailyArticles() {
-        logger.info("開始執行每日文章資料處理排程...");
+        logger.info("開始取得昨天的文章資訊...");
 
-        // 1. 計算昨日的日期範圍
         LocalDate yesterday = LocalDate.now().minusDays(1);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+        //取得今天的日期並減去1天，定義符合 Summary API 規格的格式
 
         LocalDateTime startDateTime = yesterday.atStartOfDay();
         LocalDateTime endDateTime = yesterday.atTime(LocalTime.MAX);
+        //定義為yesterday的00:00:00和23:59:59
 
         String startDate = startDateTime.format(formatter);
         String endDate = endDateTime.format(formatter);
+        //轉換成符合 Summary API 規格的格式
 
         logger.info("取得日期範圍: {} 至 {}", startDate, endDate);
 
         try {
-            // 2. 呼叫 API
             SummaryApiResponse apiResponse = apiClient.fetchArticles(startDate, endDate);
+            // 呼叫 ApiClient 的方法，並傳入計算好的時間範圍
 
-            // 3. 檢查回應
             if (apiResponse != null && apiResponse.getResponseInfo() != null) {
                 String errorCode = apiResponse.getResponseInfo().getErrorCode();
                 String errorMessage = apiResponse.getResponseInfo().getErrorMessage();
+                // 確認 response 是否為 null
 
                 if ("0".equals(errorCode)) {
                     List<Article> articles = apiResponse.getResult();
+                    // 若請求成功就從 apiResponse 中取得 result 陣列
 
                     if (articles != null && !articles.isEmpty()) {
                         logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
 
                         LocalDateTime now = LocalDateTime.now();
                         for (Article article : articles) {
-                            // 新資料 → 補 createTime & updateTime
                             if (article.getCreateTime() == null) {
                                 article.setCreateTime(now);
+                            // 如果文章的創建時間為 null，就將其設為現在的時間
                             }
-                            // 舊資料 → updateTime 更新
                             article.setUpdateTime(now);
-
-                            // 使用 UPSERT 避免主鍵衝突
                             articleDao.upsert(article);
+                            // 將更新時間設為現在的時間
                         }
 
                         logger.info("已成功處理 {} 筆文章資料。", articles.size());
@@ -90,6 +91,6 @@ public class DataProcessingService {
             logger.error("資料處理過程中發生例外錯誤：", e);
         }
 
-        logger.info("每日文章資料處理排程執行完畢。");
+        logger.info("文章資料處理排程執行完畢。");
     }
 }

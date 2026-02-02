@@ -1,221 +1,72 @@
 package com.opview.summary.entity;
 
-import com.google.gson.annotations.SerializedName;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-@Table("ts_page_content")
+import java.time.LocalDateTime;
+
+@Table("news_article") // 表名稱改為 news_article
 public class Article {
 
     @Id
-    private String id;
+    private Long id; // 改用 Long 自增主鍵，管理比較方便
 
-    private String title;
-    private String content;
-
-    @SerializedName("s_name")
-    @Column("s_name")
-    private String sName;
-
-    @SerializedName("s_area_name")
-    @Column("s_area_name")
-    private String sAreaName;
-
-    @SerializedName("page_url")
-    @Column("page_url")
-    private String pageUrl;
-
-    @SerializedName("post_time")
-    @Column("post_time")
-    private String postTime;
+    @Column("source_name")
+    private String sourceName; // 來源媒體名稱 (如 BBC News)
 
     private String author;
 
-    @SerializedName("main_id")
-    @Column("main_id")
-    private String mainId;
+    private String title;
 
-    @SerializedName("positive_percentage")
-    @Column("positive_percentage")
-    private float positivePercentage;
+    @Column("description")
+    private String description; // 新聞簡介
 
-    @SerializedName("negative_percentage")
-    @Column("negative_percentage")
-    private float negativePercentage;
+    @Column("url")
+    private String url; // 原文連結
 
-    @SerializedName("comment_count")
-    @Column("comment_count")
-    private int commentCount;
+    @Column("url_to_image")
+    private String urlToImage; // 圖片連結
 
-    @SerializedName("view_count")
-    @Column("view_count")
-    private int viewCount;
+    @Column("published_at")
+    private LocalDateTime publishedAt; // 發布時間
 
-    @SerializedName("used_count")
-    @Column("used_count")
-    private int usedCount;
+    @Column("content")
+    private String content; // 內文 (NewsAPI 免費版通常只有截錄)
 
-    @SerializedName("content_type")
-    @Column("content_type")
-    private String contentType;
-
-    @SerializedName("sentiment_tag")
-    @Column("sentiment_tag")
-    private String sentimentTag;
-
-    @SerializedName("_hit_num")
-    @Column("_hit_num")
-    private int hitNum;
-
-    @SerializedName("article_type")
-    @Column("article_type")
-    private String articleType;
+    @Column("summary")
+    private String summary; // **新增**：給 Gemini 填寫總結的欄位
 
     @Column("create_time")
-    private String createTime; // 保留 String
+    private LocalDateTime createTime;
 
     @Column("update_time")
-    private String updateTime; // 保留 String
+    private LocalDateTime updateTime;
 
-    // === Getter / Setter ===
-    public String getId() {
-        return id;
-    }
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getContent() {
-        return content;
-    }
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getSName() {
-        return sName;
-    }
-    public void setSName(String sName) {
-        this.sName = sName;
-    }
-
-    public String getSAreaName() {
-        return sAreaName;
-    }
-    public void setSAreaName(String sAreaName) {
-        this.sAreaName = sAreaName;
-    }
-
-    public String getPageUrl() {
-        return pageUrl;
-    }
-    public void setPageUrl(String pageUrl) {
-        this.pageUrl = pageUrl;
-    }
-
-    public String getPostTime() {
-        return postTime;
-    }
-    public void setPostTime(String postTime) {
-        this.postTime = postTime;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-    public void setAuthor(String author) {
-        this.author = author;
-    }
-
-    public String getMainId() {
-        return mainId;
-    }
-    public void setMainId(String mainId) {
-        this.mainId = mainId;
-    }
-
-    public float getPositivePercentage() {
-        return positivePercentage;
-    }
-    public void setPositivePercentage(float positivePercentage) {
-        this.positivePercentage = positivePercentage;
-    }
-
-    public float getNegativePercentage() {
-        return negativePercentage;
-    }
-    public void setNegativePercentage(float negativePercentage) {
-        this.negativePercentage = negativePercentage;
-    }
-
-    public int getCommentCount() {
-        return commentCount;
-    }
-    public void setCommentCount(int commentCount) {
-        this.commentCount = commentCount;
-    }
-
-    public int getViewCount() {
-        return viewCount;
-    }
-    public void setViewCount(int viewCount) {
-        this.viewCount = viewCount;
-    }
-
-    public int getUsedCount() {
-        return usedCount;
-    }
-    public void setUsedCount(int usedCount) {
-        this.usedCount = usedCount;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public String getSentimentTag() {
-        return sentimentTag;
-    }
-    public void setSentimentTag(String sentimentTag) {
-        this.sentimentTag = sentimentTag;
-    }
-
-    public int getHitNum() {
-        return hitNum;
-    }
-    public void setHitNum(int hitNum) {
-        this.hitNum = hitNum;
-    }
-
-    public String getArticleType() {
-        return articleType;
-    }
-    public void setArticleType(String articleType) {
-        this.articleType = articleType;
-    }
-
-    public String getCreateTime() {
-        return createTime;
-    }
-    public void setCreateTime(String createTime) {
-        this.createTime = createTime;
-    }
-
-    public String getUpdateTime() {
-        return updateTime;
-    }
-    public void setUpdateTime(String updateTime) {
-        this.updateTime = updateTime;
-    }
+    // === Getters / Setters ===
+    // (你可以使用 IDE 自動生成，這裡省略以節省篇幅)
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getSourceName() { return sourceName; }
+    public void setSourceName(String sourceName) { this.sourceName = sourceName; }
+    public String getAuthor() { return author; }
+    public void setAuthor(String author) { this.author = author; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
+    public String getUrlToImage() { return urlToImage; }
+    public void setUrlToImage(String urlToImage) { this.urlToImage = urlToImage; }
+    public LocalDateTime getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
+    public LocalDateTime getCreateTime() { return createTime; }
+    public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
+    public LocalDateTime getUpdateTime() { return updateTime; }
+    public void setUpdateTime(LocalDateTime updateTime) { this.updateTime = updateTime; }
 }
