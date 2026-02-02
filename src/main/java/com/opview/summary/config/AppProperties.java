@@ -1,5 +1,6 @@
 package com.opview.summary.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -19,6 +20,16 @@ public class AppProperties {
 
     // 排程設定
     private String cronExpression;
+
+    // 對應 application.properties 中的 newsapi.key 等
+    @Value("${newsapi.key}")
+    private String newsApiKey;
+
+    @Value("${newsapi.url}")
+    private String newsApiUrl;
+
+    @Value("${newsapi.query}")
+    private String newsApiQuery;
     
     // 省略 Getter 和 Setter
     // 透過 IDE 自動產生即可
@@ -77,5 +88,15 @@ public class AppProperties {
     
     public void setCronExpression(String cronExpression) {
         this.cronExpression = cronExpression;
+    }
+
+    public String getNewsApiKey() { 
+        return newsApiKey; 
+    }
+    public String getNewsApiUrl() { 
+        return newsApiUrl; 
+    }
+    public String getNewsApiQuery() { 
+        return newsApiQuery; 
     }
 }

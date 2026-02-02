@@ -1,9 +1,9 @@
 package com.opview.summary.service;
 
 import com.opview.summary.dao.ArticleDao;
+import com.opview.summary.dto.DeleteRequest;
 import com.opview.summary.dto.QueryRequest;
 import com.opview.summary.dto.UpdateRequest;
-import com.opview.summary.dto.DeleteRequest;
 import com.opview.summary.entity.Article;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +20,6 @@ public class ArticleService {
 
     private final ArticleDao articleDao;
     private final NamedParameterJdbcTemplate jdbcTemplate;
-    // 允許使用具名參數的 JdbcTemplate
 
     @Autowired
     public ArticleService(ArticleDao articleDao, NamedParameterJdbcTemplate jdbcTemplate) {
@@ -27,35 +27,41 @@ public class ArticleService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    //查詢文章
+    // 查詢文章 (對應新的 news_article 表)
     public List<Article> queryArticles(QueryRequest request) {
+        // 修改：移除 sentiment_tag 篩選，將 post_time 改為 published_at
         String sql = """
-            SELECT * FROM ts_page_content
-            WHERE post_time BETWEEN :start AND :end
-              AND sentiment_tag = 'N'
+            SELECT * FROM news_article
+            WHERE published_at BETWEEN :start AND :end
         """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("start", request.getStartTime())
                 .addValue("end", request.getEndTime());
-                //設定 SQL 語句中的具名參數
 
         return jdbcTemplate.query(sql, params,
                 (rs, rowNum) -> {
                     Article a = new Article();
-                    //將資料庫回傳的 ResultSet 轉換為 Article 物件
-                    a.setId(rs.getString("id"));
-                    a.setTitle(rs.getString("title"));
-                    a.setContent(rs.getString("content"));
-                    a.setsName(rs.getString("s_name"));
-                    a.setsAreaName(rs.getString("s_area_name"));
-                    a.setPageUrl(rs.getString("page_url"));
-                    a.setPostTime(rs.getTimestamp("post_time") != null
-                            ? rs.getTimestamp("post_time").toLocalDateTime()
-                            : null);
+                    // 修改：ID 改為 Long，並對應新欄位名稱
+                    a.setId(rs.getLong("id"));
+                    a.setSourceName(rs.getString("source_name"));
                     a.setAuthor(rs.getString("author"));
-                    a.setMainId(rs.getString("main_id"));
-                    a.setSentimentTag(rs.getString("sentiment_tag"));
+                    a.setTitle(rs.getString("title"));
+                    a.setDescription(rs.getString("description"));
+                    a.setUrl(rs.getString("url"));
+                    a.setUrlToImage(rs.getString("url_to_image"));
+                    
+                    a.setPublishedAt(rs.getTimestamp("published_at") != null
+                            ? rs.getTimestamp("published_at").toLocalDateTime()
+                            : null);
+                            
+                    a.setContent(rs.getString("content"));
+                    a.setSummary(rs.getString("summary"));
+                    
+                    a.setCreateTime(rs.getTimestamp("create_time") != null
+                            ? rs.getTimestamp("create_time").toLocalDateTime()
+                            : null);
+                            
                     a.setUpdateTime(rs.getTimestamp("update_time") != null
                             ? rs.getTimestamp("update_time").toLocalDateTime()
                             : null);
@@ -63,53 +69,57 @@ public class ArticleService {
                 });
     }
 
-    //更新文章
+    // 更新文章
     public String updateArticle(UpdateRequest request) {
         if (request.getFields() == null || request.getFields().isEmpty()) {
             return "更新失敗：未提供任何更新欄位";
         }
 
-        List<String> immutableFields = List.of("id", "create_time");
-        //定義不可被修改的欄位
+        // 修改：定義欄位映射 (前端欄位名稱 -> 資料庫欄位名稱)
+        // 這樣可以防止 SQL Injection 並且處理駝峰式命名轉底線
+        Map<String, String> allowedFields = new HashMap<>();
+        allowedFields.put("title", "title");
+        allowedFields.put("content", "content");
+        allowedFields.put("author", "author");
+        allowedFields.put("description", "description");
+        allowedFields.put("summary", "summary"); // 新增 summary 欄位
+        allowedFields.put("sourceName", "source_name");
+        allowedFields.put("urlToImage", "url_to_image");
 
-        StringBuilder sql = new StringBuilder("UPDATE ts_page_content SET ");
+        StringBuilder sql = new StringBuilder("UPDATE news_article SET ");
         MapSqlParameterSource params = new MapSqlParameterSource();
-        //動態拼接 SQL 語句
 
         boolean hasValidField = false;
         StringBuilder ignoredFields = new StringBuilder();
 
         for (Map.Entry<String, Object> entry : request.getFields().entrySet()) {
-            String field = entry.getKey();
-            //遍歷前端傳來的所有要更新的欄位
-
-            if (immutableFields.contains(field)) {
-                ignoredFields.append(field).append(" ");
-                continue;
-                //忽略不可被修改的欄位
+            String inputField = entry.getKey();
+            
+            // 檢查是否為允許更新的欄位
+            if (allowedFields.containsKey(inputField)) {
+                String dbColumn = allowedFields.get(inputField);
+                sql.append(dbColumn).append(" = :").append(inputField).append(", ");
+                params.addValue(inputField, entry.getValue());
+                hasValidField = true;
+            } else {
+                ignoredFields.append(inputField).append(" ");
             }
-
-            sql.append(field).append(" = :").append(field).append(", ");
-            params.addValue(field, entry.getValue());
-            hasValidField = true;
-            //將可更新的欄位添加到 SQL 語句中
         }
 
         if (!hasValidField) {
-            return "更新失敗：全部欄位不可更動 (忽略: " + ignoredFields + ")";
+            return "更新失敗：沒有有效的更新欄位 (忽略: " + ignoredFields + ")";
         }
 
+        // 修改：ID 參數處理 (注意 request.getId() 如果是字串可能需要轉型，這裡假設 request 傳來的是 Long 或數字字串)
         sql.append("update_time = :updateTime WHERE id = :id");
         params.addValue("updateTime", LocalDateTime.now());
-        params.addValue("id", request.getId());
-        //將更新時間和 ID 添加到 SQL 語句中
+        params.addValue("id", request.getId()); 
 
         int rows = jdbcTemplate.update(sql.toString(), params);
-        //執行 SQL 更新
 
         if (rows > 0) {
             if (ignoredFields.length() > 0) {
-                return "部分更新成功，但以下欄位不可更動已被忽略: " + ignoredFields;
+                return "部分更新成功，但以下欄位不可更動或不存在已被忽略: " + ignoredFields;
             } else {
                 return "更新成功";
             }
@@ -118,63 +128,62 @@ public class ArticleService {
         }
     }
 
-    //刪除文章
+    // 刪除文章
     public List<Map<String, Object>> deleteArticlesWithInfo(DeleteRequest request) {
+        // 修改：查詢條件改為 news_article 與 published_at
         String selectSql = """
-            SELECT id, title FROM ts_page_content
-            WHERE post_time BETWEEN :start AND :end
-              AND sentiment_tag = 'N'
+            SELECT id, title FROM news_article
+            WHERE published_at BETWEEN :start AND :end
         """;
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("start", request.getStartTime())
                 .addValue("end", request.getEndTime());
-                //設定 SQL 語句中的具名參數
 
         List<Map<String, Object>> toDelete = jdbcTemplate.query(selectSql, params,
                 (rs, rowNum) -> Map.of(
-                        "id", rs.getString("id"),
+                        "id", rs.getLong("id"), // ID 改為 Long
                         "title", rs.getString("title")
-                        //將資料庫回傳的 ResultSet 轉換為 Map 物件
                 ));
 
         if (!toDelete.isEmpty()) {
+            // 修改：刪除語句
             String deleteSql = """
-                DELETE FROM ts_page_content
-                WHERE post_time BETWEEN :start AND :end
-                  AND sentiment_tag = 'N'
+                DELETE FROM news_article
+                WHERE published_at BETWEEN :start AND :end
             """;
             jdbcTemplate.update(deleteSql, params);
-            //如果有符合條件的文章，執行 SQL 刪除
         }
 
         return toDelete;
     }
 
-    
-
-     //查詢指定時間範圍的前 10 筆文章內容(回傳 id + title + content) 給 Gemini 用    
+    // 查詢前 10 筆文章給 Gemini (回傳 id + title + content)
     public List<Map<String, String>> findTop10Contents(LocalDateTime start, LocalDateTime end) {
+        // 修改：使用 news_article，並按 published_at 排序
         String sql = """
             SELECT id, title, content
-            FROM ts_page_content
-            WHERE post_time BETWEEN :start AND :end
-            ORDER BY post_time DESC
+            FROM news_article
+            WHERE published_at BETWEEN :start AND :end
+            ORDER BY published_at DESC
             LIMIT 10
         """;
-        //取出前 10 筆最新的文章
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("start", start)
                 .addValue("end", end);
-                //設定 SQL 語句中的具名參數
 
         return jdbcTemplate.query(sql, params,
-                (rs, rowNum) -> Map.of(
-                        "id", rs.getString("id"),
+                (rs, rowNum) -> {
+                    // 注意：content 可能為 null，處理一下避免 Map.of 報錯
+                    String content = rs.getString("content");
+                    if (content == null) content = "";
+                    
+                    return Map.of(
+                        "id", String.valueOf(rs.getLong("id")), // 轉字串方便後續處理
                         "title", rs.getString("title"),
-                        "content", rs.getString("content")
-                        //將資料庫回傳的 ResultSet 轉換為 Map 物件
-                ));
+                        "content", content
+                    );
+                });
     }
 }

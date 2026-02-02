@@ -1,52 +1,47 @@
 package com.opview.summary.dao;
 
 import com.opview.summary.entity.Article;
-import org.springframework.data.jdbc.repository.query.Modifying;
-import org.springframework.data.jdbc.repository.query.Query;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.data.repository.query.Param;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ArticleDao extends CrudRepository<Article, String> {
+public class ArticleDao {
 
-    /**
-     * 使用 MySQL/MariaDB 的 ON DUPLICATE KEY UPDATE 做 UPSERT
-     */
-    @Modifying
-    @Query("""
-        INSERT INTO ts_page_content (
-            id, title, content, s_name, s_area_name, page_url, post_time,
-            author, main_id, positive_percentage, negative_percentage,
-            comment_count, view_count, used_count, content_type,
-            sentiment_tag, _hit_num, article_type, create_time, update_time
-        ) VALUES (
-            :#{#a.id}, :#{#a.title}, :#{#a.content}, :#{#a.sName}, :#{#a.sAreaName},
-            :#{#a.pageUrl}, :#{#a.postTime}, :#{#a.author}, :#{#a.mainId},
-            :#{#a.positivePercentage}, :#{#a.negativePercentage},
-            :#{#a.commentCount}, :#{#a.viewCount}, :#{#a.usedCount},
-            :#{#a.contentType}, :#{#a.sentimentTag}, :#{#a.hitNum},
-            :#{#a.articleType}, :#{#a.createTime}, :#{#a.updateTime}
-        )
-        ON DUPLICATE KEY UPDATE
-            title = VALUES(title),
-            content = VALUES(content),
-            s_name = VALUES(s_name),
-            s_area_name = VALUES(s_area_name),
-            page_url = VALUES(page_url),
-            post_time = VALUES(post_time),
-            author = VALUES(author),
-            main_id = VALUES(main_id),
-            positive_percentage = VALUES(positive_percentage),
-            negative_percentage = VALUES(negative_percentage),
-            comment_count = VALUES(comment_count),
-            view_count = VALUES(view_count),
-            used_count = VALUES(used_count),
-            content_type = VALUES(content_type),
-            sentiment_tag = VALUES(sentiment_tag),
-            _hit_num = VALUES(_hit_num),
-            article_type = VALUES(article_type),
-            update_time = VALUES(update_time)
-        """)
-    void upsert(@Param("a") Article article);
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ArticleDao(NamedParameterJdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public void upsert(Article article) {
+        // 基於 URL 判斷：如果 URL 已存在則更新，否則新增
+        String sql = "INSERT INTO news_article " +
+                "(source_name, author, title, description, url, url_to_image, published_at, content, create_time, update_time) " +
+                "VALUES " +
+                "(:sourceName, :author, :title, :description, :url, :urlToImage, :publishedAt, :content, :createTime, :updateTime) " +
+                "ON DUPLICATE KEY UPDATE " +
+                "title = :title, " +
+                "description = :description, " +
+                "url_to_image = :urlToImage, " +
+                "update_time = :updateTime";
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("sourceName", article.getSourceName());
+        params.addValue("author", article.getAuthor());
+        params.addValue("title", article.getTitle());
+        params.addValue("description", article.getDescription());
+        params.addValue("url", article.getUrl());
+        params.addValue("urlToImage", article.getUrlToImage());
+        params.addValue("publishedAt", article.getPublishedAt());
+        params.addValue("content", article.getContent());
+        params.addValue("createTime", article.getCreateTime());
+        params.addValue("updateTime", article.getUpdateTime());
+
+        jdbcTemplate.update(sql, params);
+    }
+    
+    // 這裡可以保留或新增其他查詢方法，例如 findAll, findByDate 等，視後續需求而定
 }

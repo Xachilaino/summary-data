@@ -1,8 +1,9 @@
 package com.opview.summary.service;
 
 import com.opview.summary.dao.ArticleDao;
+import com.opview.summary.dto.news.NewsArticleDto;
+import com.opview.summary.dto.news.NewsResponseDto;
 import com.opview.summary.entity.Article;
-import com.opview.summary.entity.SummaryApiResponse;
 import com.opview.summary.util.ApiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 public class DataProcessingService {
@@ -29,68 +28,59 @@ public class DataProcessingService {
         this.articleDao = articleDao;
     }
 
-    
-     
-     
     public void processDailyArticles() {
-        logger.info("開始取得昨天的文章資訊...");
-
+        // 取得昨天的日期 (NewsAPI 免費版通常只能查最近一個月的資料)
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
-        //取得今天的日期並減去1天，定義符合 Summary API 規格的格式
+        String fromDate = yesterday.toString(); // yyyy-MM-dd
 
-        LocalDateTime startDateTime = yesterday.atStartOfDay();
-        LocalDateTime endDateTime = yesterday.atTime(LocalTime.MAX);
-        //定義為yesterday的00:00:00和23:59:59
+        logger.info("開始處理新聞資料，日期: {}", fromDate);
 
-        String startDate = startDateTime.format(formatter);
-        String endDate = endDateTime.format(formatter);
-        //轉換成符合 Summary API 規格的格式
+        NewsResponseDto response = apiClient.fetchArticles(fromDate);
 
-        logger.info("取得日期範圍: {} 至 {}", startDate, endDate);
+        if (response != null && response.getArticles() != null) {
+            logger.info("取得 {} 筆原始新聞資料", response.getArticles().size());
 
-        try {
-            SummaryApiResponse apiResponse = apiClient.fetchArticles(startDate, endDate);
-            // 呼叫 ApiClient 的方法，並傳入計算好的時間範圍
-
-            if (apiResponse != null && apiResponse.getResponseInfo() != null) {
-                String errorCode = apiResponse.getResponseInfo().getErrorCode();
-                String errorMessage = apiResponse.getResponseInfo().getErrorMessage();
-                // 確認 response 是否為 null
-
-                if ("0".equals(errorCode)) {
-                    List<Article> articles = apiResponse.getResult();
-                    // 若請求成功就從 apiResponse 中取得 result 陣列
-
-                    if (articles != null && !articles.isEmpty()) {
-                        logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
-
-                        LocalDateTime now = LocalDateTime.now();
-                        for (Article article : articles) {
-                            if (article.getCreateTime() == null) {
-                                article.setCreateTime(now);
-                            // 如果文章的創建時間為 null，就將其設為現在的時間
-                            }
-                            article.setUpdateTime(now);
-                            articleDao.upsert(article);
-                            // 將更新時間設為現在的時間
-                        }
-
-                        logger.info("已成功處理 {} 筆文章資料。", articles.size());
-                    } else {
-                        logger.warn("API 回應成功，但沒有取得任何文章資料。");
-                    }
-                } else {
-                    logger.error("從 API 取得文章資料失敗。錯誤碼: {}, 錯誤訊息: {}", errorCode, errorMessage);
+            for (NewsArticleDto dto : response.getArticles()) {
+                // 資料轉換: DTO -> Entity
+                Article article = new Article();
+                
+                // 處理可能為 null 的欄位
+                article.setTitle(dto.getTitle() != null ? dto.getTitle() : "No Title");
+                article.setUrl(dto.getUrl());
+                article.setDescription(dto.getDescription());
+                article.setContent(dto.getContent());
+                article.setAuthor(dto.getAuthor());
+                article.setUrlToImage(dto.getUrlToImage());
+                
+                if (dto.getSource() != null) {
+                    article.setSourceName(dto.getSource().getName());
                 }
-            } else {
-                // 🔹 responseInfo 為 null，直接輸出原始 JSON
-                logger.error("API 回應格式異常，可能是 mapping 錯誤。原始回應: {}", apiResponse);
-            }
-        } catch (Exception e) {
-            logger.error("資料處理過程中發生例外錯誤：", e);
-        }
 
-        logger.info("文章資料處理排程執行完畢。");
+                // 時間處理
+                try {
+                    // NewsAPI 回傳的是 ISO_INSTANT (e.g., 2023-10-25T10:30:00Z)
+                    if (dto.getPublishedAt() != null) {
+                        LocalDateTime pubTime = LocalDateTime.parse(dto.getPublishedAt(), DateTimeFormatter.ISO_DATE_TIME);
+                        article.setPublishedAt(pubTime);
+                    }
+                } catch (Exception e) {
+                    logger.warn("日期解析失敗: {}", dto.getPublishedAt());
+                    article.setPublishedAt(LocalDateTime.now());
+                }
+
+                article.setCreateTime(LocalDateTime.now());
+                article.setUpdateTime(LocalDateTime.now());
+
+                // 寫入資料庫
+                try {
+                    articleDao.upsert(article);
+                } catch (Exception e) {
+                    logger.error("寫入新聞失敗: {}", article.getTitle(), e);
+                }
+            }
+            logger.info("新聞資料處理完成。");
+        } else {
+            logger.warn("未取得任何新聞資料。");
+        }
     }
 }

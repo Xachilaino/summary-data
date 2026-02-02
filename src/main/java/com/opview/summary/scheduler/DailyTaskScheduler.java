@@ -26,7 +26,7 @@ public class DailyTaskScheduler {
     }
 
 
-    @Scheduled(cron = "${opview.api.cronExpression}")
+    @Scheduled(cron = "${app.cron.expression}")
     //每日自動化排程任務，參數 ${opview.api.cronExpression} 從 application.properties 中讀取
     public void runDailyTask() {
         logger.info("開始執行任務，時間：{}", LocalDateTime.now());
