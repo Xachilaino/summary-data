@@ -21,20 +21,24 @@ public class SummaryController {
         this.geminiService = geminiService;
     }
 
-
-    // POST /api/summary
     @PostMapping("/summary")
     public ResponseEntity<?> getSummary(@RequestBody QueryRequest request) {
-        // 將請求的 JSON 轉換為 QueryRequest
         try {
-            var top10 = articleService.findTop10Contents(
+            // 1. 撈取前 10 篇文章
+            var top10Articles = articleService.findTop10Contents(
                     request.getStartTime(),
                     request.getEndTime()
-                    // 呼叫 articleService 的 findTop10Contents 方法
             );
-            List<Map<String, String>> summaries = geminiService.summarizeEachArticle(top10);
-            return ResponseEntity.ok(summaries);
-            // 由 geminiService 負責處理與gemini API相關的邏輯
+
+            // 2. 呼叫 Gemini 產生一篇總評
+            String overallSummaryText = geminiService.generateOverallSummary(top10Articles);
+
+            // 3. 回傳組合結果 (Map)
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "overallSummary", overallSummaryText,
+                    "articles", top10Articles
+            ));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
