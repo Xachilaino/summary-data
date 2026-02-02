@@ -16,9 +16,7 @@ import java.time.format.DateTimeFormatter;
 
 @Service
 public class DataProcessingService {
-
     private static final Logger logger = LoggerFactory.getLogger(DataProcessingService.class);
-
     private final ApiClient apiClient;
     private final ArticleDao articleDao;
 
@@ -29,58 +27,33 @@ public class DataProcessingService {
     }
 
     public void processDailyArticles() {
-        // 取得昨天的日期 (NewsAPI 免費版通常只能查最近一個月的資料)
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        String fromDate = yesterday.toString(); // yyyy-MM-dd
-
-        logger.info("開始處理新聞資料，日期: {}", fromDate);
+        // 設定抓取日為昨天 (2026-02-01)
+        String fromDate = LocalDate.now().minusDays(1).toString(); 
+        logger.info("開始抓取新聞，日期範圍從: {}", fromDate);
 
         NewsResponseDto response = apiClient.fetchArticles(fromDate);
 
-        if (response != null && response.getArticles() != null) {
-            logger.info("取得 {} 筆原始新聞資料", response.getArticles().size());
-
+        if (response != null && "ok".equals(response.getStatus()) && response.getArticles() != null) {
+            logger.info("成功取得 {} 筆新聞", response.getArticles().size());
             for (NewsArticleDto dto : response.getArticles()) {
-                // 資料轉換: DTO -> Entity
                 Article article = new Article();
-                
-                // 處理可能為 null 的欄位
-                article.setTitle(dto.getTitle() != null ? dto.getTitle() : "No Title");
-                article.setUrl(dto.getUrl());
+                article.setTitle(dto.getTitle());
                 article.setDescription(dto.getDescription());
-                article.setContent(dto.getContent());
-                article.setAuthor(dto.getAuthor());
-                article.setUrlToImage(dto.getUrlToImage());
+                article.setUrl(dto.getUrl());
+                article.setSourceName(dto.getSource() != null ? dto.getSource().getName() : "Unknown");
                 
-                if (dto.getSource() != null) {
-                    article.setSourceName(dto.getSource().getName());
+                // 解析時間 (NewsAPI 使用 ISO 格式)
+                if (dto.getPublishedAt() != null) {
+                    article.setPublishedAt(LocalDateTime.parse(dto.getPublishedAt(), DateTimeFormatter.ISO_DATE_TIME));
                 }
-
-                // 時間處理
-                try {
-                    // NewsAPI 回傳的是 ISO_INSTANT (e.g., 2023-10-25T10:30:00Z)
-                    if (dto.getPublishedAt() != null) {
-                        LocalDateTime pubTime = LocalDateTime.parse(dto.getPublishedAt(), DateTimeFormatter.ISO_DATE_TIME);
-                        article.setPublishedAt(pubTime);
-                    }
-                } catch (Exception e) {
-                    logger.warn("日期解析失敗: {}", dto.getPublishedAt());
-                    article.setPublishedAt(LocalDateTime.now());
-                }
-
+                
                 article.setCreateTime(LocalDateTime.now());
                 article.setUpdateTime(LocalDateTime.now());
-
-                // 寫入資料庫
-                try {
-                    articleDao.upsert(article);
-                } catch (Exception e) {
-                    logger.error("寫入新聞失敗: {}", article.getTitle(), e);
-                }
+                
+                articleDao.upsert(article);
             }
-            logger.info("新聞資料處理完成。");
         } else {
-            logger.warn("未取得任何新聞資料。");
+            logger.warn("未抓取到任何資料。");
         }
     }
 }
