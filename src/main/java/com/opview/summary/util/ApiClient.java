@@ -26,46 +26,39 @@ public class ApiClient {
         this.restTemplate = restTemplate;
     }
 
-    /**
-     * 從 NewsAPI 取得文章
-     * @param fromDate 起始日期 (格式: yyyy-MM-dd)
-     * @return NewsResponseDto
-     */
     public NewsResponseDto fetchArticles(String fromDate) {
-        // 從 application.properties 讀取設定
         String apiUrl = appProperties.getNewsApiUrl();
         String apiKey = appProperties.getNewsApiKey();
         String query = appProperties.getNewsApiQuery();
+        String language = appProperties.getNewsApiLanguage();
+        String pageSize = appProperties.getNewsApiPageSize();
+        
+        // (新增) 讀取排序設定，如果沒設定預設給 publishedAt
+        String sortBy = appProperties.getNewsApiSortBy();
+        if (sortBy == null || sortBy.isEmpty()) {
+            sortBy = "publishedAt";
+        }
 
-        // 建立請求 URL (例如: https://newsapi.org/v2/everything?q=AI&from=2023-10-01&apiKey=...)
+        // 組合 API URL
         URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                 .queryParam("q", query)
                 .queryParam("from", fromDate)
-                .queryParam("sortBy", "publishedAt")
+                .queryParam("sortBy", sortBy) // (修改) 這裡改用變數
                 .queryParam("apiKey", apiKey)
-                .queryParam("language", "en") // 建議先限制英文，Gemini 處理較穩
+                .queryParam("language", language)
+                .queryParam("pageSize", pageSize)
                 .build()
                 .toUri();
 
-        logger.info("正在向 NewsAPI 發送請求: query={}, date={}", query, fromDate);
+        logger.info("發送 NewsAPI 請求: query={}, lang={}, size={}, sort={}", query, language, pageSize, sortBy);
 
         try {
-            // 發送 GET 請求
-            NewsResponseDto response = restTemplate.getForObject(uri, NewsResponseDto.class);
-
-            if (response != null && "ok".equals(response.getStatus())) {
-                logger.info("成功取得 {} 筆新聞資料", response.getTotalResults());
-                return response;
-            } else {
-                logger.error("API 回應狀態非 OK: {}", response != null ? response.getStatus() : "null");
-                return null;
-            }
-
+            return restTemplate.getForObject(uri, NewsResponseDto.class);
         } catch (HttpClientErrorException e) {
             logger.error("HTTP 錯誤: {} - {}", e.getStatusCode(), e.getStatusText());
             return null;
         } catch (Exception e) {
-            logger.error("呼叫 NewsAPI 發生未知錯誤", e);
+            logger.error("NewsAPI 請求失敗", e);
             return null;
         }
     }

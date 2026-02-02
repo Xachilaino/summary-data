@@ -1,9 +1,9 @@
 package com.opview.summary.service;
 
 import com.opview.summary.dao.ArticleDao;
-import com.opview.summary.dto.DeleteRequest;
 import com.opview.summary.dto.QueryRequest;
 import com.opview.summary.dto.UpdateRequest;
+import com.opview.summary.dto.DeleteRequest;
 import com.opview.summary.entity.Article;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -27,9 +27,8 @@ public class ArticleService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    // 查詢文章 (對應新的 news_article 表)
+    // 查詢文章 (已更新為 news_article)
     public List<Article> queryArticles(QueryRequest request) {
-        // 修改：移除 sentiment_tag 篩選，將 post_time 改為 published_at
         String sql = """
             SELECT * FROM news_article
             WHERE published_at BETWEEN :start AND :end
@@ -42,26 +41,18 @@ public class ArticleService {
         return jdbcTemplate.query(sql, params,
                 (rs, rowNum) -> {
                     Article a = new Article();
-                    // 修改：ID 改為 Long，並對應新欄位名稱
-                    a.setId(rs.getLong("id"));
-                    a.setSourceName(rs.getString("source_name"));
-                    a.setAuthor(rs.getString("author"));
+                    a.setId(rs.getLong("id")); // ID 改為 Long
                     a.setTitle(rs.getString("title"));
-                    a.setDescription(rs.getString("description"));
+                    a.setDescription(rs.getString("description")); // 新增 description
+                    a.setContent(rs.getString("content"));
+                    a.setSourceName(rs.getString("source_name")); // 改為 source_name
                     a.setUrl(rs.getString("url"));
                     a.setUrlToImage(rs.getString("url_to_image"));
-                    
                     a.setPublishedAt(rs.getTimestamp("published_at") != null
                             ? rs.getTimestamp("published_at").toLocalDateTime()
                             : null);
-                            
-                    a.setContent(rs.getString("content"));
-                    a.setSummary(rs.getString("summary"));
-                    
-                    a.setCreateTime(rs.getTimestamp("create_time") != null
-                            ? rs.getTimestamp("create_time").toLocalDateTime()
-                            : null);
-                            
+                    a.setAuthor(rs.getString("author"));
+                    a.setSummary(rs.getString("summary")); // 取出 summary
                     a.setUpdateTime(rs.getTimestamp("update_time") != null
                             ? rs.getTimestamp("update_time").toLocalDateTime()
                             : null);
@@ -75,16 +66,14 @@ public class ArticleService {
             return "更新失敗：未提供任何更新欄位";
         }
 
-        // 修改：定義欄位映射 (前端欄位名稱 -> 資料庫欄位名稱)
-        // 這樣可以防止 SQL Injection 並且處理駝峰式命名轉底線
-        Map<String, String> allowedFields = new HashMap<>();
-        allowedFields.put("title", "title");
-        allowedFields.put("content", "content");
-        allowedFields.put("author", "author");
-        allowedFields.put("description", "description");
-        allowedFields.put("summary", "summary"); // 新增 summary 欄位
-        allowedFields.put("sourceName", "source_name");
-        allowedFields.put("urlToImage", "url_to_image");
+        // 定義允許更新的欄位對照表 (前端欄位 -> 資料庫欄位)
+        Map<String, String> fieldMapping = new HashMap<>();
+        fieldMapping.put("title", "title");
+        fieldMapping.put("content", "content");
+        fieldMapping.put("description", "description");
+        fieldMapping.put("author", "author");
+        fieldMapping.put("sourceName", "source_name");
+        fieldMapping.put("summary", "summary");
 
         StringBuilder sql = new StringBuilder("UPDATE news_article SET ");
         MapSqlParameterSource params = new MapSqlParameterSource();
@@ -95,9 +84,8 @@ public class ArticleService {
         for (Map.Entry<String, Object> entry : request.getFields().entrySet()) {
             String inputField = entry.getKey();
             
-            // 檢查是否為允許更新的欄位
-            if (allowedFields.containsKey(inputField)) {
-                String dbColumn = allowedFields.get(inputField);
+            if (fieldMapping.containsKey(inputField)) {
+                String dbColumn = fieldMapping.get(inputField);
                 sql.append(dbColumn).append(" = :").append(inputField).append(", ");
                 params.addValue(inputField, entry.getValue());
                 hasValidField = true;
@@ -110,27 +98,17 @@ public class ArticleService {
             return "更新失敗：沒有有效的更新欄位 (忽略: " + ignoredFields + ")";
         }
 
-        // 修改：ID 參數處理 (注意 request.getId() 如果是字串可能需要轉型，這裡假設 request 傳來的是 Long 或數字字串)
         sql.append("update_time = :updateTime WHERE id = :id");
         params.addValue("updateTime", LocalDateTime.now());
-        params.addValue("id", request.getId()); 
+        params.addValue("id", request.getId());
 
         int rows = jdbcTemplate.update(sql.toString(), params);
 
-        if (rows > 0) {
-            if (ignoredFields.length() > 0) {
-                return "部分更新成功，但以下欄位不可更動或不存在已被忽略: " + ignoredFields;
-            } else {
-                return "更新成功";
-            }
-        } else {
-            return "更新失敗：找不到指定 ID";
-        }
+        return rows > 0 ? "更新成功" : "更新失敗：找不到指定 ID";
     }
 
     // 刪除文章
     public List<Map<String, Object>> deleteArticlesWithInfo(DeleteRequest request) {
-        // 修改：查詢條件改為 news_article 與 published_at
         String selectSql = """
             SELECT id, title FROM news_article
             WHERE published_at BETWEEN :start AND :end
@@ -142,27 +120,22 @@ public class ArticleService {
 
         List<Map<String, Object>> toDelete = jdbcTemplate.query(selectSql, params,
                 (rs, rowNum) -> Map.of(
-                        "id", rs.getLong("id"), // ID 改為 Long
+                        "id", rs.getLong("id"), // Long
                         "title", rs.getString("title")
                 ));
 
         if (!toDelete.isEmpty()) {
-            // 修改：刪除語句
-            String deleteSql = """
-                DELETE FROM news_article
-                WHERE published_at BETWEEN :start AND :end
-            """;
+            String deleteSql = "DELETE FROM news_article WHERE published_at BETWEEN :start AND :end";
             jdbcTemplate.update(deleteSql, params);
         }
 
         return toDelete;
     }
 
-    // 查詢前 10 筆文章給 Gemini (回傳 id + title + content)
+    // 查詢前 10 筆文章給 Gemini (修改：抓取 description 而非 content)
     public List<Map<String, String>> findTop10Contents(LocalDateTime start, LocalDateTime end) {
-        // 修改：使用 news_article，並按 published_at 排序
         String sql = """
-            SELECT id, title, content
+            SELECT id, title, description
             FROM news_article
             WHERE published_at BETWEEN :start AND :end
             ORDER BY published_at DESC
@@ -175,14 +148,13 @@ public class ArticleService {
 
         return jdbcTemplate.query(sql, params,
                 (rs, rowNum) -> {
-                    // 注意：content 可能為 null，處理一下避免 Map.of 報錯
-                    String content = rs.getString("content");
-                    if (content == null) content = "";
+                    String desc = rs.getString("description");
+                    if (desc == null) desc = ""; // 避免 null
                     
                     return Map.of(
-                        "id", String.valueOf(rs.getLong("id")), // 轉字串方便後續處理
+                        "id", String.valueOf(rs.getLong("id")),
                         "title", rs.getString("title"),
-                        "content", content
+                        "description", desc // 傳回 description
                     );
                 });
     }
