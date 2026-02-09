@@ -6,6 +6,8 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+
 @Repository
 public class ArticleDao {
 
@@ -42,6 +44,20 @@ public class ArticleDao {
 
         jdbcTemplate.update(sql, params);
     }
-    
-    // 這裡可以保留或新增其他查詢方法，例如 findAll, findByDate 等，視後續需求而定
+
+    /**
+     * [新增] 檢查指定日期是否有新聞資料
+     * @param date 指定日期 (例如 2026-02-08)
+     * @return 該日期的文章數量
+     */
+    public int countArticlesByDate(LocalDate date) {
+        // 這裡使用 DATE() 函數確保只比對日期部分
+        String sql = "SELECT COUNT(*) FROM news_article WHERE DATE(published_at) = :date";
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("date", date);
+
+        Integer count = jdbcTemplate.queryForObject(sql, params, Integer.class);
+        return count != null ? count : 0;
+    }
 }
