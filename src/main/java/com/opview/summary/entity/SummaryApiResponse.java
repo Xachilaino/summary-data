@@ -6,12 +6,12 @@ import java.util.List;
 public class SummaryApiResponse {
 
     @SerializedName("response_info")
-    private ResponseInfo responseInfo;
+    private ResponseInfo responseInfo;   // 使用獨立 class
 
     @SerializedName("result")
     private List<Article> result;
 
-    // 🔹 保留 API 原始 JSON（方便 debug）
+    // 🔹 保留 API 原始 JSON
     private transient String rawJson;
 
     public ResponseInfo getResponseInfo() {

@@ -1,5 +1,8 @@
 package com.opview.summary.controller;
 
+import com.opview.summary.dto.QueryRequest;
+import com.opview.summary.dto.UpdateRequest;
+import com.opview.summary.dto.DeleteRequest;
 import com.opview.summary.entity.Article;
 import com.opview.summary.service.ArticleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,49 +23,57 @@ public class ArticleController {
         this.articleService = articleService;
     }
 
-    /**
-     * 查詢文章
-     */
+    // 查詢文章
     @PostMapping("/query")
-    public ResponseEntity<?> queryArticles(@RequestBody Map<String, String> request) {
-        String startTime = request.get("startTime");
-        String endTime = request.get("endTime");
-        List<Article> result = articleService.queryArticles(startTime, endTime);
+    public ResponseEntity<?> queryArticles(@RequestBody QueryRequest request) {
+        // 將 json body 轉換為 QueryRequest
+        List<Article> result = articleService.queryArticles(request);
+        // 呼叫 articleService.queryArticles
+        if (result == null || result.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "message", "查無符合條件的文章"
+            ));
+        }
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "data", result
+                "articles", result
         ));
     }
 
-    /**
-     * 更新文章
-     */
+    // 更新文章
     @PostMapping("/update")
-    public ResponseEntity<?> updateArticle(@RequestBody Map<String, Object> request) {
-        String id = (String) request.get("id");
-        Map<String, Object> fields = (Map<String, Object>) request.get("fields");
-
-        boolean success = articleService.updateArticle(id, fields);
+    public ResponseEntity<Map<String, Object>> updateArticle(@RequestBody UpdateRequest request) {
+        // 將 json body 轉換為 UpdateRequest
+        String message = articleService.updateArticle(request);
+        // 呼叫 articleService.updateArticle
+        boolean success = message.contains("成功"); 
+        // 判斷是否成功
 
         return ResponseEntity.ok(Map.of(
                 "success", success,
-                "message", success ? "更新成功" : "找不到文章",
-                "updatedId", id
+                "id", request.getId(),
+                "message", message
         ));
     }
 
-    /**
-     * 刪除文章
-     */
+    // 刪除文章
     @PostMapping("/delete")
-    public ResponseEntity<?> deleteArticles(@RequestBody Map<String, String> request) {
-        String startTime = request.get("startTime");
-        String endTime = request.get("endTime");
-        int deleted = articleService.deleteArticles(startTime, endTime);
+    public ResponseEntity<Map<String, Object>> deleteArticles(@RequestBody DeleteRequest request) {
+        // 將 json body 轉換為 DeleteRequest
+        List<Map<String, Object>> deleted = articleService.deleteArticlesWithInfo(request);
+        // 呼叫 articleService.deleteArticlesWithInfo
+        if (deleted.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                    "success", false,
+                    "message", "查無符合條件的文章可刪除"
+            ));
+        }
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "deletedCount", deleted
+                "deletedCount", deleted.size(),
+                "deletedArticles", deleted
         ));
     }
 }

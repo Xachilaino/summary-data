@@ -25,35 +25,32 @@ public class DailyTaskScheduler {
         this.dataProcessingService = dataProcessingService;
     }
 
-    /**
-     * 每日自動化排程任務
-     * cron = "0 0 10 * * ?" 表示每日上午10:00執行
-     * 參數 ${opview.api.cronExpression} 從 application.properties 中讀取
-     */
-    @Scheduled(cron = "${opview.api.cronExpression}")
+
+    @Scheduled(cron = "${app.cron.expression}")
+    //每日自動化排程任務，參數 ${opview.api.cronExpression} 從 application.properties 中讀取
     public void runDailyTask() {
-        logger.info("排程任務開始執行，時間：{}", LocalDateTime.now());
+        logger.info("開始執行任務，時間：{}", LocalDateTime.now());
 
         ExecutionLog log = new ExecutionLog();
         log.setStartTime(LocalDateTime.now());
         
-        // 儲存任務開始時間的紀錄
         ExecutionLog savedLog = logDao.save(log);
+        // 儲存任務開始時間
 
         try {
-            // 呼叫 DataProcessingService 來執行核心業務邏輯
-            dataProcessingService.processDailyArticles();
-            
-            // 任務成功完成後，記錄結束時間
+            dataProcessingService.processDailyArticles();           
+            // 呼叫 DataProcessingService 來執行任務
+                        
             savedLog.setEndTime(LocalDateTime.now());
             logDao.save(savedLog);
-            logger.info("排程任務執行成功，時間：{}", LocalDateTime.now());
+            logger.info("任務執行成功，時間：{}", LocalDateTime.now());
+            // 執行成功時，更新任務結束時間
 
         } catch (Exception e) {
-            // 如果任務執行失敗，記錄錯誤訊息並更新結束時間
-            logger.error("排程任務執行失敗：{}", e.getMessage(), e);
+            logger.error("任務執行失敗：{}", e.getMessage(), e);
             savedLog.setEndTime(LocalDateTime.now());
             logDao.save(savedLog);
+            // 如果任務執行失敗，記錄錯誤訊息並更新結束時間
         }
     }
 }

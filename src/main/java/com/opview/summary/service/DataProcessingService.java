@@ -1,8 +1,9 @@
 package com.opview.summary.service;
 
 import com.opview.summary.dao.ArticleDao;
+import com.opview.summary.dto.news.NewsArticleDto;
+import com.opview.summary.dto.news.NewsResponseDto;
 import com.opview.summary.entity.Article;
-import com.opview.summary.entity.SummaryApiResponse;
 import com.opview.summary.util.ApiClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,15 +12,11 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 public class DataProcessingService {
-
     private static final Logger logger = LoggerFactory.getLogger(DataProcessingService.class);
-
     private final ApiClient apiClient;
     private final ArticleDao articleDao;
 
@@ -30,66 +27,72 @@ public class DataProcessingService {
     }
 
     /**
-     * 執行整個資料處理流程：取得昨日文章資訊並存入資料庫。
+     * 每日排程執行的任務 (抓取昨天的資料，使用預設設定)
      */
     public void processDailyArticles() {
-        logger.info("開始執行每日文章資料處理排程...");
+        String fromDate = LocalDate.now().minusDays(1).toString(); 
+        logger.info("開始每日抓取任務，日期: {}", fromDate);
+        NewsResponseDto response = apiClient.fetchArticles(fromDate); // 使用預設參數
+        saveArticles(response);
+    }
 
-        // 1. 計算昨日的日期範圍
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+    /**
+     * [新增] 檢查並補檔邏輯
+     * 1. 檢查 2 天前有沒有資料
+     * 2. 若無，迴圈抓取前 7 天資料 (pageSize=100, sortBy=popularity)
+     */
+    public void checkAndBackfillData() {
+        LocalDate twoDaysAgo = LocalDate.now().minusDays(2);
+        int count = articleDao.countArticlesByDate(twoDaysAgo);
+        
+        logger.info("檢查日期 {} 的資料量: {}", twoDaysAgo, count);
 
-        LocalDateTime startDateTime = yesterday.atStartOfDay();
-        LocalDateTime endDateTime = yesterday.atTime(LocalTime.MAX);
-
-        String startDate = startDateTime.format(formatter);
-        String endDate = endDateTime.format(formatter);
-
-        logger.info("取得日期範圍: {} 至 {}", startDate, endDate);
-
-        try {
-            // 2. 呼叫 API
-            SummaryApiResponse apiResponse = apiClient.fetchArticles(startDate, endDate);
-
-            // 3. 檢查回應
-            if (apiResponse != null && apiResponse.getResponseInfo() != null) {
-                String errorCode = apiResponse.getResponseInfo().getErrorCode();
-                String errorMessage = apiResponse.getResponseInfo().getErrorMessage();
-
-                if ("0".equals(errorCode)) {
-                    List<Article> articles = apiResponse.getResult();
-
-                    if (articles != null && !articles.isEmpty()) {
-                        logger.info("成功從 API 取得 {} 筆文章資料。", articles.size());
-
-                        LocalDateTime now = LocalDateTime.now();
-                        for (Article article : articles) {
-                            // 新資料 → 補 createTime & updateTime
-                            if (article.getCreateTime() == null) {
-                                article.setCreateTime(now);
-                            }
-                            // 舊資料 → updateTime 更新
-                            article.setUpdateTime(now);
-
-                            // 使用 UPSERT 避免主鍵衝突
-                            articleDao.upsert(article);
-                        }
-
-                        logger.info("已成功處理 {} 筆文章資料。", articles.size());
-                    } else {
-                        logger.warn("API 回應成功，但沒有取得任何文章資料。");
-                    }
-                } else {
-                    logger.error("從 API 取得文章資料失敗。錯誤碼: {}, 錯誤訊息: {}", errorCode, errorMessage);
-                }
-            } else {
-                // 🔹 responseInfo 為 null，直接輸出原始 JSON
-                logger.error("API 回應格式異常，可能是 mapping 錯誤。原始回應: {}", apiResponse);
+        if (count == 0) {
+            logger.warn("發現資料缺漏！開始執行『7日熱門新聞補檔』任務...");
+            
+            // 迴圈抓取過去 7 天 (從昨天開始往回推)
+            for (int i = 1; i <= 7; i++) {
+                String targetDate = LocalDate.now().minusDays(i).toString();
+                logger.info("正在補抓 {} 的熱門新聞 (100筆, 熱度排序)...", targetDate);
+                
+                // 呼叫 API: 日期, pageSize=100, sortBy=popularity
+                NewsResponseDto response = apiClient.fetchArticles(targetDate, 100, "popularity");
+                
+                saveArticles(response);
+                
+                // 禮貌性暫停 1 秒，避免被 API 視為攻擊
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
             }
-        } catch (Exception e) {
-            logger.error("資料處理過程中發生例外錯誤：", e);
+            logger.info("7日補檔任務完成！");
+        } else {
+            logger.info("資料完整，無需補檔。");
         }
+    }
 
-        logger.info("每日文章資料處理排程執行完畢。");
+    /**
+     * 統一儲存邏輯，避免代碼重複
+     */
+    private void saveArticles(NewsResponseDto response) {
+        if (response != null && "ok".equals(response.getStatus()) && response.getArticles() != null) {
+            logger.info("成功取得 {} 筆新聞", response.getArticles().size());
+            for (NewsArticleDto dto : response.getArticles()) {
+                Article article = new Article();
+                article.setTitle(dto.getTitle());
+                article.setDescription(dto.getDescription());
+                article.setUrl(dto.getUrl());
+                article.setSourceName(dto.getSource() != null ? dto.getSource().getName() : "Unknown");
+                
+                if (dto.getPublishedAt() != null) {
+                    article.setPublishedAt(LocalDateTime.parse(dto.getPublishedAt(), DateTimeFormatter.ISO_DATE_TIME));
+                }
+                
+                article.setCreateTime(LocalDateTime.now());
+                article.setUpdateTime(LocalDateTime.now());
+                
+                articleDao.upsert(article);
+            }
+        } else {
+            logger.warn("未抓取到任何資料。");
+        }
     }
 }
